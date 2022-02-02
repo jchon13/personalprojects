@@ -121,9 +121,3 @@ class DoublyLinkedList{
 
 module.exports = DoublyLinkedList;
 
-const a = new DoublyLinkedList();
-console.log(a);
-a.addToHead('Banana');
-a.addToHead('Apple');
-a.addToHead('Papaya');
-a.printList();
