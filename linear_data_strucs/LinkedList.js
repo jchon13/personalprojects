@@ -60,7 +60,3 @@ class LinkedList{
 module.exports = LinkedList;
 
 
-const a = new LinkedList();
-
-a.addToHead('Banana');
-a.printList();
