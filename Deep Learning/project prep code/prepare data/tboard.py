@@ -1,3 +1,4 @@
+from matplotlib.pyplot import grid
 from numpy import int32
 import torch
 import torch.nn as nn
@@ -7,7 +8,7 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 
-#from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 
 torch.set_printoptions(linewidth=120)
 
@@ -68,6 +69,12 @@ network = Network()
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=100, shuffle=True)
 optimizer = optim.Adam(network.parameters(),lr=0.01)
 
+grid = torchvision.utils.make_grid(images)
+#Tensorboard setup
+tb = SummaryWriter()
+
+tb.add_image('images',grid)
+tb.add_graph(network,images)
 
 
 
@@ -96,6 +103,10 @@ for epoch in range(5):
     print("epoch:",epoch +1 ,"total_correct:",total_correct,"total_loss:",total_loss)
     
     
+
+tb.close()
+
+
 
 
 @torch.no_grad()
