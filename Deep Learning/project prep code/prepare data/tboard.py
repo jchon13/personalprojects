@@ -10,6 +10,7 @@ import torchvision.transforms as transforms
 
 from torch.utils.tensorboard import SummaryWriter
 
+
 torch.set_printoptions(linewidth=120)
 
 def get_num_correct(predictions,labels):
@@ -110,7 +111,8 @@ for epoch in range(5):
 
     print("epoch:",epoch +1 ,"total_correct:",total_correct,"total_loss:",total_loss)
     
-    #broken?
+    
+
 tb.close()
 
 
