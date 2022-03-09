@@ -110,8 +110,7 @@ for epoch in range(5):
 
     print("epoch:",epoch +1 ,"total_correct:",total_correct,"total_loss:",total_loss)
     
-    
-
+    #broken?
 tb.close()
 
 
