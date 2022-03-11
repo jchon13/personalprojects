@@ -1,5 +1,6 @@
 from matplotlib.pyplot import grid
 from numpy import int32
+from sklearn.utils import shuffle
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -70,12 +71,7 @@ network = Network()
 train_loader = torch.utils.data.DataLoader(train_set, batch_size=100)
 optimizer = optim.Adam(network.parameters(),lr=0.01)
 
-images,labels = next(iter(train_loader))
-grid = torchvision.utils.make_grid(images)
-#Tensorboard setup
-tb = SummaryWriter()
-tb.add_image('images',grid)
-tb.add_graph(network,images)
+
 
 
 
@@ -101,19 +97,11 @@ for epoch in range(5):
             (all_predictions, preds),dim=0
         )
     
-    tb.add_scalar('Loss',total_loss,epoch) #Make scalar grad ('tag',data(y),epoch(x))
-    tb.add_scalar('Number Correct',total_correct,epoch)
-    tb.add_scalar('Accuracy',total_correct/len(train_set),epoch)
-
-    tb.add_histogram('conv1.bias', network.conv1.bias, epoch)
-    tb.add_histogram('conv1.weight', network.conv1.weight, epoch)
-    tb.add_histogram('conv1.weight.grad',network.conv1.weight.grad,epoch)
 
     print("epoch:",epoch +1 ,"total_correct:",total_correct,"total_loss:",total_loss)
     
     
 
-tb.close()
 
 
 

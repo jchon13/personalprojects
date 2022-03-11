@@ -9,6 +9,8 @@ import torchvision.transforms as transforms
 
 from torch.utils.tensorboard import SummaryWriter
 
+from itertools import product
+
 torch.set_printoptions(linewidth=120)
 
 def get_num_correct(predictions,labels):
@@ -63,52 +65,69 @@ train_set = torchvision.datasets.FashionMNIST(
     ])
 )
 
-network = Network()
-
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=100)
-optimizer = optim.Adam(network.parameters(),lr=0.01)
-
-images, labels = next(iter(train_loader))
-grid = torchvision.utils.make_grid(images)
-
-tb = SummaryWriter()
-tb.add_image('images', grid)
-tb.add_graph(network, images)
 
 
-for epoch in range(5):
-    all_predictions = torch.tensor([])
-    total_loss = 0 
-    total_correct = 0
+parameters = dict(
+    lr = [0.01]
+    ,batch_size = [100,1000]
+)
 
-    for batch in train_loader:
+parameter_values = [v for v in parameters.values()]
 
-        images, labels = batch
 
-        preds = network(images)
-        loss= F.cross_entropy(preds,labels)
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+for lr,batch_size in product(*parameter_values):
+    network = Network() 
+    run_comment = f'batch_size={batch_size}, lr={lr}'
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size)
+    optimizer = optim.Adam(network.parameters(),lr=lr)
+    images, labels = next(iter(train_loader))
+    grid = torchvision.utils.make_grid(images)
 
-        total_loss += loss.item()
-        total_correct += get_num_correct(preds,labels)
+    tb = SummaryWriter(comment=run_comment)
+    tb.add_image('images', grid)
+    tb.add_graph(network, images)
 
-        all_predictions = torch.cat(
-            (all_predictions, preds),dim=0
-        )
+    print(lr, batch_size)
 
-    tb.add_scalar('Loss', total_loss, epoch)
-    tb.add_scalar('Number Correct', total_correct, epoch)
-    tb.add_scalar('Accuracy', total_correct / len(train_set), epoch)
+    for epoch in range(10):
+        all_predictions = torch.tensor([])
+        total_loss = 0 
+        total_correct = 0
 
-    tb.add_histogram('conv1.bias', network.conv1.bias, epoch)
-    tb.add_histogram('conv1.weight', network.conv1.weight, epoch)
-    tb.add_histogram('conv1.weight.grad', network.conv1.weight.grad, epoch)
+        #print(total_correct)
 
-    print("epoch:",epoch +1 ,"total_correct:",total_correct,"total_loss:",total_loss)
-    
-tb.close()
+        for batch in train_loader:
+
+            images, labels = batch
+
+            preds = network(images)
+            loss= F.cross_entropy(preds,labels)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            total_loss += loss.item() * batch_size
+            total_correct += get_num_correct(preds,labels)
+
+            '''all_predictions = torch.cat(
+                (all_predictions, preds),dim=0
+            )'''
+
+        tb.add_scalar('Loss', total_loss, epoch)
+        tb.add_scalar('Number Correct', total_correct, epoch)
+        tb.add_scalar('Accuracy', total_correct / len(train_set), epoch)
+        '''
+        tb.add_histogram('conv1.bias', network.conv1.bias, epoch)
+        tb.add_histogram('conv1.weight', network.conv1.weight, epoch)
+        tb.add_histogram('conv1.weight.grad', network.conv1.weight.grad, epoch)'''
+
+        for name, weight in network.named_parameters():
+            tb.add_histogram(name, weight, epoch)
+            tb.add_histogram(f'{name}.grad', weight.grad, epoch)
+
+        print("epoch:",epoch +1 ,"total_correct:",total_correct,"total_loss:",total_loss)
+        
+    tb.close()
 
 
 @torch.no_grad()
@@ -125,7 +144,7 @@ def get_all_predictions(model,loader):
 
 
 #print(train_predictions.shape)
-
+'''
 #with torch.no_grad(): #locally turn off gradient tracking, uses less memory
 prediction_loader = torch.utils.data.DataLoader(train_set,batch_size=1000)
 #train_predictions = get_all_predictions(network,prediction_loader)
@@ -146,4 +165,4 @@ for p in stacked:
     j, k = p.tolist()
     cmt[j,k]=cmt[j,k]+1
 
-print(cmt)
+print(cmt)'''
