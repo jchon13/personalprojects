@@ -122,7 +122,7 @@ def remover(guess,result, possible_words):
             for g_words in good_words[:]:
                 if un_word2 == g_words:
                     good_words.remove(un_word2)
-        print(unallowed_words2)
+        #print(unallowed_words2)
     
 
 
