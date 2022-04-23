@@ -89,6 +89,12 @@ class CircularQueue(Queue[T]):
         self.front = (self.front+1) % len(self.array)
         return item 
 
+    def peek(self) -> T:
+        if self.is_empty():
+            raise Exception("Queue is empty")
+
+        return self.array[self.front]
+
     def is_full(self) -> T:
         """ True if the queue is full and no element can be appended. """
         return len(self) == len(self.array)

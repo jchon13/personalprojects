@@ -20,6 +20,9 @@ class Charmander(PB):
     def get_stats(self):
         return 'Charmander\'s, Speed = ' + str(self.speed) + ', Attack = ' + str(self.attack) + ', Type = ' + str(self.poke_type)
 
+    def __str__(self):
+         return 'Charmander\'s HP = ' + str(self.hp) + ' and level = ' +str(self.level)
+
     def calc_damage(self,damage) -> int:
         if damage > self.defence:
             self.hp = self.hp - damage
@@ -49,6 +52,9 @@ class Bulbasaur(PB):
     def get_stats(self):
         return 'Bulbasaur\'s, Speed = ' + str(self.speed) + ', Attack = ' + str(self.attack) + ', Type = ' + str(self.poke_type)
 
+    def __str__(self):
+         return 'Bulbasaur\'s HP = ' + str(self.hp) + ' and level = ' +str(self.level)
+
     def calc_damage(self,damage) -> int:
         if damage > self.defence + 5:
             self.hp = self.hp - damage
@@ -77,6 +83,10 @@ class Squirtle(PB):
     def get_stats(self):
         return 'Squirtle\'s, Speed = ' + str(self.speed) + ', Attack = ' + str(self.attack) + ', Type = ' + str(self.poke_type)
 
+    def __str__(self):
+         return 'Squirtle\'s HP = ' + str(self.hp) + ' and level = ' +str(self.level)
+
+
     def calc_damage(self,damage) -> int:
         if damage > self.defence*2:
             self.hp = self.hp - damage
@@ -85,7 +95,3 @@ class Squirtle(PB):
         return self.hp
 
 
-a = Squirtle()
-print(a.get_hp_and_level())
-print(a.set_hp(50))
-print(a.get_hp_and_level())
