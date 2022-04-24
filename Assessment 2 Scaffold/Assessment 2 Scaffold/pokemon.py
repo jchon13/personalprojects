@@ -15,6 +15,8 @@ class Charmander(PB):
 
     def set_level(self,level) -> None:
         self.level = level
+        self.attack = 6 + self.level
+        self.speed = 7 + self.level
 
     #name, speed, attackand poke_type of the Pokemon
     def get_stats(self):
@@ -58,6 +60,7 @@ class Bulbasaur(PB):
 
     def set_level(self,level) -> None:
         self.level = level
+        self.speed = 7 + (self.level //2)
 
     #name, speed, attackand poke_type of the Pokemon
     def get_stats(self):
@@ -100,6 +103,8 @@ class Squirtle(PB):
 
     def set_level(self,level) -> None:
         self.level = level
+        self.attack = 4 + self.level//2
+        self.defence = 6 + self.level
 
     #name, speed, attackand poke_type of the Pokemon
     def get_stats(self):

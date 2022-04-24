@@ -1,5 +1,5 @@
-from poke_team import PokeTeam
-
+from trial_team import PokeTeam
+from pokemon import Charmander, Bulbasaur,Squirtle
 
 class Battle:
     def __init__(self,team1_name: str, team2_name: str) -> None:
@@ -156,4 +156,6 @@ class Battle:
             return self.team1.trainer_name
         else: pass
 
+battle = Battle("Ash","Misty")
 
+print(battle.rotating_mode_battle())
