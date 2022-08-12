@@ -1,4 +1,9 @@
 {
     "python.terminal.activateEnvironment": true,
-    "python.condaPath": "D:\\Anaconda\\Scripts\\conda.exe"
+    "python.condaPath": "D:\\Anaconda\\Scripts\\conda.exe",
+    "C_Cpp.errorSquiggles": "Enabled",
+    "files.associations": {
+        "stdio.h": "c",
+        "func.h": "c"
+    }
 }

@@ -1,12 +1,11 @@
-secret = 42
-guess = int(input("Enter guess: "))
-diff = secret - guess
+username = input("Login: >>")
 
-print(diff)
+user1 = "jack"
+user2 = "jill"
 
-if diff < 0:
-    print("Too high")
-elif diff == 0:
-    print("Good guess!")
+if username == user1:
+    print("Access granted")
+elif username == user2:
+    print("Welcome")
 else:
-    print("Too low")
+    print("Fail")

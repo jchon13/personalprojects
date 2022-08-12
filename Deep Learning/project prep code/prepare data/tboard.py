@@ -142,3 +142,5 @@ for p in stacked:
     cmt[j,k]=cmt[j,k]+1
 
 print(cmt)
+
+#tensorboard --logdir=runs
