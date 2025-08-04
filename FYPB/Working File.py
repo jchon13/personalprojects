@@ -106,6 +106,8 @@ class ShapeDrawer:
         self.redraw()
 
     def draw_lights(self):
+        self.display_light_area()
+
     # Create a single transparent overlay for all radii
         overlay = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
@@ -125,6 +127,8 @@ class ShapeDrawer:
             self.canvas.create_oval(sx - r, sy - r, sx + r, sy + r, fill=color, outline="black")
 
         # Convert the overlay to a PhotoImage and show it
+        self.light_overlay = ImageTk.PhotoImage(overlay)
+        self.canvas.create_image(0, 0, image=self.light_overlay, anchor="nw")
         self.light_overlay = ImageTk.PhotoImage(overlay)
         self.canvas.create_image(0, 0, image=self.light_overlay, anchor="nw")
 
@@ -247,6 +251,7 @@ class ShapeDrawer:
                 self.draw_segment_length(*scaled_points[-1], *scaled_points[0])
                 self.display_area()
         self.draw_lights()
+        self.calculate_lit_area_within_shape()
 
     def draw_translucent_polygon(self, scaled_points):
         overlay = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
@@ -280,6 +285,60 @@ class ShapeDrawer:
         text = f"Area: {area_m2:.2f} m²"
         self.canvas.create_rectangle(5, 5, 180, 30, fill='white', outline='gray')
         self.canvas.create_text(10, 10, anchor="nw", text=text, fill="blue", font=("Arial", 14))
+
+    def display_light_area(self):
+        import numpy as np
+        light_mask = Image.new("L", (CANVAS_WIDTH, CANVAS_HEIGHT), 0)
+        draw = ImageDraw.Draw(light_mask)
+        influence_radius = 20  # meters
+        radius_px = int(influence_radius * self.scale_factor)
+
+        for x, y, _ in self.light_circles:
+            sx = int(x * self.zoom_level + self.offset_x)
+            sy = int(y * self.zoom_level + self.offset_y)
+            draw.ellipse([sx - radius_px, sy - radius_px, sx + radius_px, sy + radius_px], fill=1)
+
+        mask_array = np.array(light_mask)
+        unique_area_px = np.count_nonzero(mask_array)
+        unique_area_m2 = unique_area_px / (self.scale_factor ** 2)
+
+        text = f"Light Area: {unique_area_m2:.2f} m²"
+        self.canvas.create_rectangle(200, 5, 420, 30, fill='white', outline='gray')
+        self.canvas.create_text(210, 10, anchor="nw", text=text, fill="darkgreen", font=("Arial", 14))
+
+
+    def calculate_lit_area_within_shape(self):
+        import numpy as np
+        if not self.shape_complete or not self.points:
+            return
+
+        # Create mask for lights
+        light_mask = Image.new("L", (CANVAS_WIDTH, CANVAS_HEIGHT), 0)
+        draw_light = ImageDraw.Draw(light_mask)
+        influence_radius = 20  # meters
+        radius_px = int(influence_radius * self.scale_factor)
+
+        for x, y, _ in self.light_circles:
+            sx = int(x * self.zoom_level + self.offset_x)
+            sy = int(y * self.zoom_level + self.offset_y)
+            draw_light.ellipse([sx - radius_px, sy - radius_px, sx + radius_px, sy + radius_px], fill=1)
+
+        # Create mask for shape
+        shape_mask = Image.new("L", (CANVAS_WIDTH, CANVAS_HEIGHT), 0)
+        draw_shape = ImageDraw.Draw(shape_mask)
+        scaled_points = [(x * self.zoom_level + self.offset_x, y * self.zoom_level + self.offset_y) for x, y in self.points]
+        draw_shape.polygon(scaled_points, fill=1)
+
+        # Combine masks
+        light_array = np.array(light_mask)
+        shape_array = np.array(shape_mask)
+        intersection = np.logical_and(light_array, shape_array)
+        intersection_area_px = np.count_nonzero(intersection)
+        intersection_area_m2 = intersection_area_px / (self.scale_factor ** 2)
+
+        text = f"Lit Area Inside Shape: {intersection_area_m2:.2f} m²"
+        self.canvas.create_rectangle(430, 5, 730, 30, fill='white', outline='gray')
+        self.canvas.create_text(440, 10, anchor="nw", text=text, fill="darkorange", font=("Arial", 14))
 
     def complete_shape(self):
         if len(self.points) < 3:
