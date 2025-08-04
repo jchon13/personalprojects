@@ -64,6 +64,7 @@ class ShapeDrawer:
 
         btn_frame = tk.Frame(root)
         btn_frame.pack()
+        tk.Button(btn_frame, text="Place Points", command=self.activate_place_points).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Complete Shape", command=self.complete_shape).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Clear", command=self.clear_canvas).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Load PDF", command=self.load_pdf_background).pack(side=tk.LEFT, padx=5)
@@ -85,10 +86,15 @@ class ShapeDrawer:
 
         tk.Button(light_frame, text="Add Lights", command=self.activate_light_mode).pack(side=tk.LEFT, padx=5)
 
+    
+    def activate_place_points(self):
+        self.canvas.config(cursor="arrow")
+        self.placing_light = False
+        self.canvas.bind("<Button-1>", self.add_point)
     def activate_light_mode(self):
-        self.placing_light = True
-        self.canvas.config(cursor="circle")
-        self.canvas.bind("<Button-1>", self.place_light)
+            self.placing_light = True
+            self.canvas.config(cursor="circle")
+            self.canvas.bind("<Button-1>", self.place_light)
 
     def place_light(self, event):
         if not self.placing_light:
@@ -100,10 +106,27 @@ class ShapeDrawer:
         self.redraw()
 
     def draw_lights(self):
+    # Create a single transparent overlay for all radii
+        overlay = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
         for x, y, color in self.light_circles:
             sx = x * self.zoom_level + self.offset_x
             sy = y * self.zoom_level + self.offset_y
-            self.canvas.create_oval(sx - 10, sy - 10, sx + 10, sy + 10, fill=color, outline='black')
+            r = 5
+            influence_radius = 20  # in meters
+            radius_px = influence_radius * self.scale_factor * self.zoom_level
+
+            # Draw translucent yellow circle on the overlay
+            draw.ellipse([sx - radius_px, sy - radius_px, sx + radius_px, sy + radius_px],
+                        fill=(255, 255, 0, 80))
+
+            # Draw the light point itself
+            self.canvas.create_oval(sx - r, sy - r, sx + r, sy + r, fill=color, outline="black")
+
+        # Convert the overlay to a PhotoImage and show it
+        self.light_overlay = ImageTk.PhotoImage(overlay)
+        self.canvas.create_image(0, 0, image=self.light_overlay, anchor="nw")
 
     def load_pdf_background(self):
         file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
