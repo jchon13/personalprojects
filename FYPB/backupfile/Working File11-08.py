@@ -11,67 +11,37 @@ CANVAS_HEIGHT = 800
 class ShapeDrawer:
     def __init__(self, root):
         self.root = root
-        self.root.geometry("1200x950")
+        self.root.geometry("1200x900")
         self.root.title("Draw Shape with Zoom, Pan, Scale, Area")
-        try:
-            self.root.state('zoomed')
-        except Exception:
-            pass
+        self.root.state('zoomed')
 
-        # ====== LIGHT TYPES, COLORS, AND SCORES ======
         self.light_colors = {
             "Diesel": "red",
             "Hydrogen": "orange",
             "Solar": "green",
             "Biodiesel": "yellow"
         }
-        # (source_score, efficiency_score)
-        self.light_scores = {
-            "Hydrogen": (1.0, 1.0),
-            "Solar": (0.306, 0.238),
-            "Diesel": (0.108, 0.388),
-            "Biodiesel": (0.578, 0.406),
-        }
-
-        # Default weekly costs per tower (AUD) — editable in UI
-        self.weekly_running_costs = {
-            "Diesel": 112,
-            "Hydrogen": 0,
-            "Solar": 0,
-            "Biodiesel": 193,
-        }
-        self.weekly_hire_costs = {
-            "Diesel": 560,
-            "Hydrogen": 430,
-            "Solar": 330,
-            "Biodiesel": 560,
-        }
 
         self.light_type = tk.StringVar(value="Diesel")
 
-        # ====== MAIN LAYOUT ======
         self.canvas_frame = tk.Frame(root)
         self.canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.side_panel = tk.Frame(self.canvas_frame, bd=1, relief=tk.GROOVE, padx=10, pady=10)
-        self.side_panel.pack(side=tk.RIGHT, fill=tk.Y, padx=8, pady=8)
-
-        self.canvas = tk.Canvas(self.canvas_frame, bg='white', width=CANVAS_WIDTH, height=CANVAS_HEIGHT)
+        self.canvas = tk.Canvas(self.canvas_frame, bg='white')
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.v_scroll = tk.Scrollbar(self.canvas_frame, orient=tk.VERTICAL, command=self.canvas.yview)
-        self.v_scroll.pack(side=tk.LEFT, fill=tk.Y)
+        self.v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.h_scroll = tk.Scrollbar(root, orient=tk.HORIZONTAL, command=self.canvas.xview)
         self.h_scroll.pack(fill=tk.X)
 
         self.canvas.configure(yscrollcommand=self.v_scroll.set, xscrollcommand=self.h_scroll.set)
 
-        # ====== STATE ======
         self.bg_image_original = None
         self.bg_image_scaled = None
         self.bg_photo = None
         self.zoom_level = 1.0
-        self.scale_factor = 10  # pixels per meter (will be set by user)
+        self.scale_factor = 10
 
         self.offset_x = 0
         self.offset_y = 0
@@ -83,9 +53,8 @@ class ShapeDrawer:
         self.scale_points = []
 
         self.placing_light = False
-        self.lights = []  # list of dicts: {x,y,type,color}
+        self.light_circles = []
 
-        # ====== BINDINGS ======
         self.canvas.bind("<Button-1>", self.add_point)
         self.canvas.bind("<Button-3>", self.remove_last_point)
         self.canvas.bind("<Motion>", self.update_mouse_line)
@@ -93,7 +62,6 @@ class ShapeDrawer:
         self.canvas.bind("<ButtonPress-2>", self.start_pan)
         self.canvas.bind("<B2-Motion>", self.do_pan)
 
-        # ====== TOP BUTTONS ======
         btn_frame = tk.Frame(root)
         btn_frame.pack()
         tk.Button(btn_frame, text="Place Points", command=self.activate_place_points).pack(side=tk.LEFT, padx=5)
@@ -102,7 +70,7 @@ class ShapeDrawer:
         tk.Button(btn_frame, text="Load PDF", command=self.load_pdf_background).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Set Scale", command=self.activate_set_scale).pack(side=tk.LEFT, padx=5)
 
-        # ====== LIGHT TYPE DROPDOWN + ADD LIGHTS ======
+        # Custom dropdown with colored lines
         light_frame = tk.Frame(root)
         light_frame.pack(pady=10)
 
@@ -112,215 +80,55 @@ class ShapeDrawer:
             def setter(value=label):
                 self.light_type.set(value)
             menu.add_command(label=label, command=setter)
-            try:
-                menu.entryconfig(label, background=color)
-            except Exception:
-                pass
+            menu.entryconfig(label, background=color)
         menu_button.config(menu=menu)
         menu_button.pack(side=tk.LEFT, padx=5)
 
         tk.Button(light_frame, text="Add Lights", command=self.activate_light_mode).pack(side=tk.LEFT, padx=5)
 
-        # ====== RIGHT-SIDE PANEL CONTENT ======
-        self.build_right_panel()
-
-        # overlays
-        self.fill_overlay = None
-        self.light_overlay = None
-
-    # ---------- Right-side UI ----------
-    def build_right_panel(self):
-        # Table (header changed to "Criteria Score")
-        table = tk.Frame(self.side_panel)
-        table.pack(anchor="n", fill="x")
-
-        header = tk.Label(table, text="Criteria Score", font=("Arial", 11, "bold"))
-        header.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0,6))
-
-        criteria = ["Environmental", "Economical", "Safety/Constructability"]
-        self.criteria_vars = {}
-        for i, name in enumerate(criteria, start=1):
-            tk.Label(table, text=name, anchor="w").grid(row=i, column=0, sticky="w", padx=(0,6), pady=3)
-            var = tk.StringVar(value="—")
-            self.criteria_vars[name] = var
-            tk.Label(table, textvariable=var, relief=tk.SUNKEN, width=20, anchor="e").grid(row=i, column=1, sticky="e", pady=3)
-
-        # Inputs
-        inputs = tk.Frame(self.side_panel)
-        inputs.pack(anchor="n", fill="x", pady=(12,0))
-
-        # Budget
-        tk.Label(inputs, text="Budget (AUD)").grid(row=0, column=0, sticky="w", pady=3)
-        self.budget_var = tk.StringVar()
-        e_budget = tk.Entry(inputs, textvariable=self.budget_var)
-        e_budget.grid(row=0, column=1, sticky="ew", pady=3)
-
-        # Duration (months)
-        tk.Label(inputs, text="Duration (months)").grid(row=1, column=0, sticky="w", pady=3)
-        self.duration_var = tk.StringVar()
-        e_duration = tk.Entry(inputs, textvariable=self.duration_var)
-        e_duration.grid(row=1, column=1, sticky="ew", pady=3)
-
-        # Hired Equipment (Y/N)
-        tk.Label(inputs, text="Hired Equipment (Y/N)").grid(row=2, column=0, sticky="w", pady=3)
-        self.hired_var = tk.StringVar(value="N")
-        radios = tk.Frame(inputs)
-        radios.grid(row=2, column=1, sticky="w", pady=3)
-        tk.Radiobutton(radios, text="Y", variable=self.hired_var, value="Y", command=self.recompute_financials).pack(side=tk.LEFT, padx=(0,8))
-        tk.Radiobutton(radios, text="N", variable=self.hired_var, value="N", command=self.recompute_financials).pack(side=tk.LEFT)
-
-        # Total Spent (computed, not an input) — placed directly below Hired Equipment
-        tk.Label(inputs, text="Total Spent (AUD)").grid(row=3, column=0, sticky="w", pady=(6,3))
-        self.total_spent_var = tk.StringVar(value="—")
-        tk.Label(inputs, textvariable=self.total_spent_var, relief=tk.SUNKEN, width=20, anchor="e").grid(row=3, column=1, sticky="ew", pady=(6,3))
-
-        inputs.grid_columnconfigure(1, weight=1)
-
-        # ---- Costs per week per tower ----
-        costs = tk.LabelFrame(self.side_panel, text="Weekly Costs per Tower (AUD)")
-        costs.pack(anchor="n", fill="x", pady=(12,0))
-
-        self.cost_vars = {}  # (type) -> (running_var, hire_var)
-        row = 0
-        tk.Label(costs, text="Type").grid(row=row, column=0, sticky="w")
-        tk.Label(costs, text="Running / wk").grid(row=row, column=1, sticky="e")
-        tk.Label(costs, text="Hire / wk").grid(row=row, column=2, sticky="e")
-        row += 1
-        for t in ["Diesel", "Hydrogen", "Solar", "Biodiesel"]:
-            tk.Label(costs, text=t).grid(row=row, column=0, sticky="w", pady=2)
-            rv = tk.StringVar(value=str(self.weekly_running_costs[t]))
-            hv = tk.StringVar(value=str(self.weekly_hire_costs[t]))
-            er = tk.Entry(costs, textvariable=rv, width=10)
-            eh = tk.Entry(costs, textvariable=hv, width=10)
-            er.grid(row=row, column=1, sticky="e", padx=4)
-            eh.grid(row=row, column=2, sticky="e", padx=4)
-            # trace recompute on change
-            rv.trace_add("write", lambda *args: self.recompute_financials())
-            hv.trace_add("write", lambda *args: self.recompute_financials())
-            self.cost_vars[t] = (rv, hv)
-            row += 1
-
-        # Trace budget/duration
-        self.budget_var.trace_add("write", lambda *args: self.recompute_financials())
-        self.duration_var.trace_add("write", lambda *args: self.recompute_financials())
-
-    # ---------- Canvas tools ----------
+    
     def activate_place_points(self):
         self.canvas.config(cursor="arrow")
         self.placing_light = False
         self.canvas.bind("<Button-1>", self.add_point)
-
     def activate_light_mode(self):
-        self.placing_light = True
-        try:
+            self.placing_light = True
             self.canvas.config(cursor="circle")
-        except Exception:
-            self.canvas.config(cursor="crosshair")
-        self.canvas.bind("<Button-1>", self.place_light)
+            self.canvas.bind("<Button-1>", self.place_light)
 
     def place_light(self, event):
         if not self.placing_light:
             return
         x = (event.x - self.offset_x) / self.zoom_level
         y = (event.y - self.offset_y) / self.zoom_level
-        ltype = self.light_type.get()
-        color = self.light_colors.get(ltype, "gray")
-        self.lights.append({"x": x, "y": y, "type": ltype, "color": color})
-        self.update_environmental_score()
-        self.recompute_financials()
+        color = self.light_colors.get(self.light_type.get(), "gray")
+        self.light_circles.append((x, y, color))
         self.redraw()
 
-    def update_environmental_score(self):
-        """Environmental total = avg(source scores) + avg(efficiency scores) over all placed lights."""
-        if not self.lights:
-            self.criteria_vars["Environmental"].set("—")
-            return
-        src_vals, eff_vals = [], []
-        for L in self.lights:
-            scores = self.light_scores.get(L["type"])
-            if scores:
-                s, e = scores
-                src_vals.append(s); eff_vals.append(e)
-        if not src_vals or not eff_vals:
-            self.criteria_vars["Environmental"].set("—")
-            return
-        total = (sum(src_vals)/len(src_vals)) + (sum(eff_vals)/len(eff_vals))
-        self.criteria_vars["Environmental"].set(f"{total:.3f}")
-
-    # ---- Financials ----
-    def parse_float(self, s):
-        try:
-            return float(str(s).strip())
-        except Exception:
-            return 0.0
-
-    def compute_total_spent(self):
-        # count lights by type
-        counts = {"Diesel":0, "Hydrogen":0, "Solar":0, "Biodiesel":0}
-        for L in self.lights:
-            t = L["type"]
-            if t in counts:
-                counts[t] += 1
-
-        months = self.parse_float(self.duration_var.get())
-        weeks = months * 4.0  # assume 4 weeks per month
-
-        hired = (self.hired_var.get().upper() == "Y")
-
-        # Sum weekly costs across all towers
-        weekly_total = 0.0
-        for t, n in counts.items():
-            rv = self.parse_float(self.cost_vars[t][0].get())  # running
-            hv = self.parse_float(self.cost_vars[t][1].get())  # hire
-            per_tower_week = rv + (hv if hired else 0.0)
-            weekly_total += n * per_tower_week
-
-        return weeks * weekly_total
-
-    def recompute_financials(self):
-        spent = self.compute_total_spent()
-        # Update total spent label
-        if spent > 0:
-            self.total_spent_var.set(f"{spent:,.2f}")
-        else:
-            self.total_spent_var.set("—")
-
-        # Economical score
-        budget = self.parse_float(self.budget_var.get())
-        econ = None
-        if spent > 0 and budget > 0:
-            if spent > budget: # overspent
-                ##econ = 1 - (budget / spent) #check with team
-                econ = (budget/spent)**0.5
-            else: # underspent or exactly on budget
-                econ = 1 + (spent / budget)
-                if econ > 2:
-                    econ = 2.0
-        elif budget > 0 and spent == 0:
-            # nothing placed yet; treat as neutral
-            econ = 1.0
-
-        if econ is None:
-            self.criteria_vars["Economical"].set("—")
-        else:
-            self.criteria_vars["Economical"].set(f"{econ:.3f}")
-
     def draw_lights(self):
+        self.display_light_area()
+
+    # Create a single transparent overlay for all radii
         overlay = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
 
-        influence_radius_m = 20  # meters
-        radius_px_nominal = influence_radius_m * self.scale_factor
-
-        for L in self.lights:
-            sx = L["x"] * self.zoom_level + self.offset_x
-            sy = L["y"] * self.zoom_level + self.offset_y
+        for x, y, color in self.light_circles:
+            sx = x * self.zoom_level + self.offset_x
+            sy = y * self.zoom_level + self.offset_y
             r = 5
-            self.canvas.create_oval(sx - r, sy - r, sx + r, sy + r, fill=L["color"], outline="black")
-            radius_px = radius_px_nominal * self.zoom_level
-            draw.ellipse([sx - radius_px, sy - radius_px, sx + radius_px, sy + radius_px],
-                         fill=(255, 255, 0, 80))
+            influence_radius = 20  # in meters
+            radius_px = influence_radius * self.scale_factor * self.zoom_level
 
+            # Draw translucent yellow circle on the overlay
+            draw.ellipse([sx - radius_px, sy - radius_px, sx + radius_px, sy + radius_px],
+                        fill=(255, 255, 0, 80))
+
+            # Draw the light point itself
+            self.canvas.create_oval(sx - r, sy - r, sx + r, sy + r, fill=color, outline="black")
+
+        # Convert the overlay to a PhotoImage and show it
+        self.light_overlay = ImageTk.PhotoImage(overlay)
+        self.canvas.create_image(0, 0, image=self.light_overlay, anchor="nw")
         self.light_overlay = ImageTk.PhotoImage(overlay)
         self.canvas.create_image(0, 0, image=self.light_overlay, anchor="nw")
 
@@ -442,8 +250,8 @@ class ShapeDrawer:
                 self.draw_translucent_polygon(scaled_points)
                 self.draw_segment_length(*scaled_points[-1], *scaled_points[0])
                 self.display_area()
-        # draw lights & translucent radii
         self.draw_lights()
+        self.calculate_lit_area_within_shape()
 
     def draw_translucent_polygon(self, scaled_points):
         overlay = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 0))
@@ -474,8 +282,63 @@ class ShapeDrawer:
     def display_area(self):
         area_px = self.calculate_area()
         area_m2 = area_px / (self.scale_factor ** 2)
+        text = f"Area: {area_m2:.2f} m²"
         self.canvas.create_rectangle(5, 5, 180, 30, fill='white', outline='gray')
-        self.canvas.create_text(10, 10, anchor="nw", text=f"Area: {area_m2:.2f} m²", fill="blue", font=("Arial", 14))
+        self.canvas.create_text(10, 10, anchor="nw", text=text, fill="blue", font=("Arial", 14))
+
+    def display_light_area(self):
+        import numpy as np
+        light_mask = Image.new("L", (CANVAS_WIDTH, CANVAS_HEIGHT), 0)
+        draw = ImageDraw.Draw(light_mask)
+        influence_radius = 20  # meters
+        radius_px = int(influence_radius * self.scale_factor)
+
+        for x, y, _ in self.light_circles:
+            sx = int(x * self.zoom_level + self.offset_x)
+            sy = int(y * self.zoom_level + self.offset_y)
+            draw.ellipse([sx - radius_px, sy - radius_px, sx + radius_px, sy + radius_px], fill=1)
+
+        mask_array = np.array(light_mask)
+        unique_area_px = np.count_nonzero(mask_array)
+        unique_area_m2 = unique_area_px / (self.scale_factor ** 2)
+
+        text = f"Light Area: {unique_area_m2:.2f} m²"
+        self.canvas.create_rectangle(200, 5, 420, 30, fill='white', outline='gray')
+        self.canvas.create_text(210, 10, anchor="nw", text=text, fill="darkgreen", font=("Arial", 14))
+
+
+    def calculate_lit_area_within_shape(self):
+        import numpy as np
+        if not self.shape_complete or not self.points:
+            return
+
+        # Create mask for lights
+        light_mask = Image.new("L", (CANVAS_WIDTH, CANVAS_HEIGHT), 0)
+        draw_light = ImageDraw.Draw(light_mask)
+        influence_radius = 20  # meters
+        radius_px = int(influence_radius * self.scale_factor)
+
+        for x, y, _ in self.light_circles:
+            sx = int(x * self.zoom_level + self.offset_x)
+            sy = int(y * self.zoom_level + self.offset_y)
+            draw_light.ellipse([sx - radius_px, sy - radius_px, sx + radius_px, sy + radius_px], fill=1)
+
+        # Create mask for shape
+        shape_mask = Image.new("L", (CANVAS_WIDTH, CANVAS_HEIGHT), 0)
+        draw_shape = ImageDraw.Draw(shape_mask)
+        scaled_points = [(x * self.zoom_level + self.offset_x, y * self.zoom_level + self.offset_y) for x, y in self.points]
+        draw_shape.polygon(scaled_points, fill=1)
+
+        # Combine masks
+        light_array = np.array(light_mask)
+        shape_array = np.array(shape_mask)
+        intersection = np.logical_and(light_array, shape_array)
+        intersection_area_px = np.count_nonzero(intersection)
+        intersection_area_m2 = intersection_area_px / (self.scale_factor ** 2)
+
+        text = f"Lit Area Inside Shape: {intersection_area_m2:.2f} m²"
+        self.canvas.create_rectangle(430, 5, 730, 30, fill='white', outline='gray')
+        self.canvas.create_text(440, 10, anchor="nw", text=text, fill="darkorange", font=("Arial", 14))
 
     def complete_shape(self):
         if len(self.points) < 3:
@@ -487,10 +350,8 @@ class ShapeDrawer:
     def clear_canvas(self):
         self.points = []
         self.shape_complete = False
-        self.lights = []
+        self.light_circles = []
         self.canvas.delete("all")
-        self.update_environmental_score()
-        self.recompute_financials()
         self.redraw()
 
 if __name__ == "__main__":
