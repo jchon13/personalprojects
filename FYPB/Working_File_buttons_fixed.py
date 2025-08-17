@@ -1,7 +1,8 @@
 
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image, ImageTk, ImageDraw, ImageGrab
+import io 
 import math
 import fitz  # PyMuPDF
 
@@ -49,8 +50,42 @@ class ShapeDrawer:
 
         self.light_type = tk.StringVar(value="Diesel")
 
+        # ====== TOP CONTROLS (CENTERED) ======
+        top_controls = tk.Frame(root)
+        top_controls.pack(side=tk.TOP, fill=tk.X)
+
+        # a centered container that holds the two rows
+        centered_block = tk.Frame(top_controls)
+        centered_block.pack(pady=(6, 4))  # pack centers by default, so this whole block is centered
+
+        # --- Buttons row ---
+        btn_frame = tk.Frame(centered_block)
+        btn_frame.pack(side=tk.TOP, pady=(0, 4))
+        tk.Button(btn_frame, text="Place Points", command=self.activate_place_points).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Complete Shape", command=self.complete_shape).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Clear", command=self.clear_canvas).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Load PDF", command=self.load_pdf_background).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Set Scale", command=self.activate_set_scale).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text=" Export Plan to PDF", command=self.export_pdf).pack(side=tk.LEFT, padx=5)
+
+        # --- Light type dropdown row ---
+        light_frame = tk.Frame(centered_block)
+        light_frame.pack(side=tk.TOP)
+        menu_button = tk.Menubutton(light_frame, textvariable=self.light_type, relief=tk.RAISED, width=16)
+        menu = tk.Menu(menu_button, tearoff=0)
+        for label, color in self.light_colors.items():
+            def setter(value=label):
+                self.light_type.set(value)
+            menu.add_command(label=label, command=setter)
+            try:
+                menu.entryconfig(label, background=color)
+            except Exception:
+                pass
+        menu_button.config(menu=menu)
+        menu_button.pack(side=tk.LEFT, padx=5)
+        tk.Button(light_frame, text="Add Lights", command=self.activate_light_mode).pack(side=tk.LEFT, padx=5)
+
         # ====== MAIN LAYOUT ======
-       
         self.canvas_frame = tk.Frame(root)
         self.canvas_frame.pack(fill=tk.BOTH, expand=True)
 
@@ -63,7 +98,7 @@ class ShapeDrawer:
         self.v_scroll = tk.Scrollbar(self.canvas_frame, orient=tk.VERTICAL, command=self.canvas.yview)
         self.v_scroll.pack(side=tk.LEFT, fill=tk.Y)
         self.h_scroll = tk.Scrollbar(root, orient=tk.HORIZONTAL, command=self.canvas.xview)
-        self.h_scroll.pack(fill=tk.X)
+        self.h_scroll.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.canvas.configure(yscrollcommand=self.v_scroll.set, xscrollcommand=self.h_scroll.set)
 
@@ -94,40 +129,24 @@ class ShapeDrawer:
         self.canvas.bind("<ButtonPress-2>", self.start_pan)
         self.canvas.bind("<B2-Motion>", self.do_pan)
 
-        # ====== TOP BUTTONS ======
-        btn_frame = tk.Frame(root)
-        btn_frame.pack()
-        tk.Button(btn_frame, text="Place Points", command=self.activate_place_points).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Complete Shape", command=self.complete_shape).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Clear", command=self.clear_canvas).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Load PDF", command=self.load_pdf_background).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Set Scale", command=self.activate_set_scale).pack(side=tk.LEFT, padx=5)
-
-        # ====== LIGHT TYPE DROPDOWN + ADD LIGHTS ======
-        light_frame = tk.Frame(root)
-        light_frame.pack(pady=10)
-
-        menu_button = tk.Menubutton(light_frame, textvariable=self.light_type, relief=tk.RAISED)
-        menu = tk.Menu(menu_button, tearoff=0)
-        for label, color in self.light_colors.items():
-            def setter(value=label):
-                self.light_type.set(value)
-            menu.add_command(label=label, command=setter)
-            try:
-                menu.entryconfig(label, background=color)
-            except Exception:
-                pass
-        menu_button.config(menu=menu)
-        menu_button.pack(side=tk.LEFT, padx=5)
-
-        tk.Button(light_frame, text="Add Lights", command=self.activate_light_mode).pack(side=tk.LEFT, padx=5)
-
         # ====== RIGHT-SIDE PANEL CONTENT ======
         self.build_right_panel()
 
         # overlays
         self.fill_overlay = None
         self.light_overlay = None
+        # ---- Undo/Redo ----
+        self.undo_stack = []
+        self.redo_stack = []
+
+        for seq in ("<Control-z>", "<Control-Z>"):
+            self.root.bind_all(seq, self.undo)
+        for seq in ("<Control-y>", "<Control-Y>", "<Shift-Control-Z>", "<Shift-Control-z>"):
+            self.root.bind_all(seq, self.redo)
+
+        # take an initial snapshot
+        self._push_undo(clear_redo=False)
+
 
     # ---------- Right-side UI ----------
     def build_right_panel(self):
@@ -204,6 +223,64 @@ class ShapeDrawer:
         # Trace budget/duration
         self.budget_var.trace_add("write", lambda *args: self.recompute_financials())
         self.duration_var.trace_add("write", lambda *args: self.recompute_financials())
+        
+        #Export to PDF
+    def export_pdf(self)
+        self
+
+        #Undo - redo
+    def _snapshot(self):
+        return {
+            "points": [tuple(p) for p in self.points],
+            "shape_complete": self.shape_complete,
+            "lights": [dict(L) for L in self.lights],
+            "scale_factor": self.scale_factor,
+            "zoom_level": self.zoom_level,
+            "offset_x": self.offset_x,
+            "offset_y": self.offset_y,
+        }
+
+    def _restore(self, s):
+        self.points = [tuple(p) for p in s.get("points", [])]
+        self.shape_complete = bool(s.get("shape_complete", False))
+        self.lights = [dict(L) for L in s.get("lights", [])]
+        self.scale_factor = float(s.get("scale_factor", self.scale_factor))
+        self.zoom_level = float(s.get("zoom_level", self.zoom_level))
+        self.offset_x = float(s.get("offset_x", self.offset_x))
+        self.offset_y = float(s.get("offset_y", self.offset_y))
+        self.update_environmental_score()
+        self.recompute_financials()
+        self.rescale_background()
+        self.redraw()
+
+    def _push_undo(self, clear_redo=True):
+        if len(self.undo_stack) > 300:
+            self.undo_stack.pop(0)
+        self.undo_stack.append(self._snapshot())
+        if clear_redo:
+            self.redo_stack.clear()
+
+    def undo(self, event=None):
+        if not self.undo_stack:
+            return
+        # move current to redo, restore last undo
+        self.redo_stack.append(self._snapshot())
+        state = self.undo_stack.pop()
+        self._restore(state)
+
+    def redo(self, event=None):
+        if not self.redo_stack:
+            return
+        # move current to undo, restore last redo
+        self.undo_stack.append(self._snapshot())
+        state = self.redo_stack.pop()
+        self._restore(state)
+        
+
+
+
+
+
 
     # ---------- Canvas tools ----------
     def activate_place_points(self):
@@ -222,6 +299,7 @@ class ShapeDrawer:
     def place_light(self, event):
         if not self.placing_light:
             return
+        self._push_undo()
         x = (event.x - self.offset_x) / self.zoom_level
         y = (event.y - self.offset_y) / self.zoom_level
         ltype = self.light_type.get()
@@ -342,6 +420,7 @@ class ShapeDrawer:
             messagebox.showerror("Error", f"Failed to load PDF: {e}")
 
     def zoom(self, event):
+        self._push_undo()
         old_zoom = self.zoom_level
         factor = 1.1 if event.delta > 0 else 0.9
         self.zoom_level = max(0.2, min(5.0, self.zoom_level * factor))
@@ -383,6 +462,7 @@ class ShapeDrawer:
         pixel_dist = math.hypot(x2 - x1, y2 - y1)
         user_input = simpledialog.askfloat("Set Scale", "Enter real-world length in meters:")
         if user_input and user_input > 0:
+            self._push_undo() 
             self.scale_factor = pixel_dist / user_input
             messagebox.showinfo("Scale Set", f"New scale: {self.scale_factor:.2f} px/m")
         else:
@@ -394,6 +474,7 @@ class ShapeDrawer:
     def add_point(self, event):
         if self.placing_light:
             return
+        self._push_undo()
         x, y = (event.x - self.offset_x) / self.zoom_level, (event.y - self.offset_y) / self.zoom_level
         if self.setting_scale:
             self.scale_points.append((x, y))
@@ -413,6 +494,7 @@ class ShapeDrawer:
 
     def remove_last_point(self, event):
         if not self.shape_complete and self.points:
+            self._push_undo()
             self.points.pop()
             self.redraw()
 
@@ -482,10 +564,12 @@ class ShapeDrawer:
         if len(self.points) < 3:
             messagebox.showinfo("Info", "At least 3 points required to complete shape.")
             return
+        self._push_undo()
         self.shape_complete = True
         self.redraw()
 
     def clear_canvas(self):
+        self._push_undo()
         self.points = []
         self.shape_complete = False
         self.lights = []
